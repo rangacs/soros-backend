@@ -1,0 +1,787 @@
+<?php
+
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
+
+/**
+ * Description of MonitorDashHelper
+ *
+ * @author veda
+ */
+define("TIME_CHECK", 0);
+
+class AnalysisDataProvider {
+
+    //put your code here
+    private $elements;
+    private $curDateTime;
+    private $curTime;
+
+    public function __construct() {
+        
+    }
+
+    public function setElements($elements) {
+        $this->elements = $elements;
+    }
+
+    public function geInterval() {
+
+        return $this->interval;
+    }
+
+    public function getElements() {
+        return $this->elements;
+    }
+
+    public function getData() {
+        $dataProvider = array();
+
+
+        foreach ($this->interval as $key => $interval) {
+
+            if ($interval['type'] == 'time') {
+                $intervalObject = new IntervalObject($interval['unit']);
+            } else {
+                $intervalObject = new TonsInterval($interval['unit']);
+
+                $intervalObject->init();
+            }
+
+            $rowAvg = $this->getIntervalAvg($intervalObject);
+
+
+            //IF result found skip row
+            if (empty($rowAvg)) {
+                $dataProvider[$key] = array();
+            } else {
+
+                $dataProvider[$key] = $rowAvg;
+            }
+        }
+
+        return $dataProvider;
+    }
+
+    public function logTime($icntr) {
+        $stTime = date("Y-m-d H:i:s");
+        $sltime = time();
+
+        $time_diff = round($sltime - $this->curTime, 2);
+
+        if (TIME_CHECK)
+            echo "Time $icntr:$stTime ($sltime) Diff: $time_diff  <br/>";
+
+        $this->curDateTime = $stTime;
+        $this->curTime = $sltime;
+    }
+
+    /**
+     *
+     * @param IntervalObject $intervalObject
+     * @return array
+     */
+    public function getIntervalAvg($intervalObject) {
+
+//        $this->logTime(21);
+        $startDate = $intervalObject->getStartTime();
+        $endTime = $intervalObject->getEndTime();
+
+
+        $elements = HeliosUtility::getDisplayElements();
+
+        $dElements = array();
+
+        foreach ($elements as $ele) {
+            $formula = Formulas::model()->find('name = :name', array(':name' => $ele));
+            if ($formula) {
+                $dElements[$ele] = "round(" . $formula->formula . " , 3) as $ele";
+            } else {
+                $dElements[$ele] = $ele;
+            }
+        }
+        $dElements['LocalendTime'] = 'LocalendTime';
+        $dElements['LocalstartTime'] = 'LocalstartTime';
+
+        $select = implode(',', $dElements);
+
+        $ansql = "select $select from analysis_A1_A2_Blend  where LocalendTime >= '" . $startDate . "'  AND LocalendTime <= '" . $endTime . "' AND totalTons != 0 ORDER BY LocalendTime DESC";
+//        $elements = $select; // $this->getElements();
+
+        $average = array();
+        $dataResuts = Yii::app()->db->createCommand($ansql)->queryAll();
+
+        $acQuery = 'select * from ac_settings ';
+        $acResults = Yii::app()->db->createCommand($acQuery)->query();
+        $acSettings = array();
+
+
+        foreach ($acResults as $item) {
+            $acSettings[$item['element_name']] = $item;
+        }
+
+        $query = "select * from rm_settings where varKey = 'ANALYZER_FILTER_BAD_RECORDS' ";
+        $result = Yii::app()->db->createCommand($query)->queryRow();
+        if ($result && $result['varValue']) {
+            $setting_filter_bad_records = (int) $result['varValue'];
+        }
+
+
+        foreach ($dataResuts as $rawData) {
+
+            //Filter Here
+            if ($setting_filter_bad_records) {
+                $row = DashHelper::validateAndSetAnalyzerRecordUsingRange($rawData, $acSettings);
+            } else {
+                $row = $rawData;
+            }
+            foreach (explode(',', $elements) as $ele) {
+
+                $tAl2O3 = (float) $row['Al2O3'];
+
+                $tSiO2 = (float) $row['SiO2'];
+
+                $tFe2O3 = (float) $row['Fe2O3'];
+
+                $tCaO = (float) $row['CaO'];
+
+                //Calculate formulas
+                if ($ele == 'LocalstartTime') {
+                    $row[$ele] = $startDate;
+                } elseif ($ele == 'LocalendTime') {
+
+                    $row[$ele] = $endTime;
+                }
+
+                $average[$ele][] = $row[$ele];
+            }
+        }
+
+
+        $eleAvg = array();
+
+        if (!empty($average)) {
+            foreach ($average as $key => $tmpArray) {
+                if ($key == 'totalTons') {
+                    $sum = array_sum($tmpArray);
+                    $eleAvg[$key] = round($sum, 2);
+
+                    continue;
+                    continue;
+                }
+
+                if ($key == 'LocalendTime') {
+                    $eleAvg[$key] = ($tmpArray[0]);
+                    continue;
+                }
+                if ($key == 'LocalstartTime') {
+                    $eleAvg[$key] = array_pop($tmpArray);
+                    continue;
+                }
+                $count = count($tmpArray);
+                $sum = array_sum($tmpArray);
+                $avg = $sum / $count;
+                $eleAvg[$key] = round($avg, 2);
+            }
+        } else {
+
+
+            foreach ($elements as $ele) {
+                $eleAvg[$ele] = '-';
+            }
+        }
+        $finagAvg = HeliosUtility::deriveAverage($row);
+        return $finagAvg;
+    }
+
+    public static function queryAvg($elements, $LocalstartTime, $LocalendTime) {
+
+
+        $startTime = date("Y-m-d H:i:00", strtotime($LocalstartTime));
+        $endTime = $LocalendTime;
+
+//        $ignoreColumns = ['dataId'];
+        $query = "select varValue from rm_settings where varKey = 'MINIMUM_TPH'";
+        $minTPH = (int) Yii::app()->db->createCommand($query)->queryScalar();
+
+        foreach ($elements as $ele) {
+
+
+            $formula = Formulas::model()->find('name = :name', array(':name' => $ele));
+            if ($formula) {
+                $avgCol[] = "round(avg(" . $formula->formula . ") , 2) as $ele";
+                continue;
+            }
+
+            if ($ele == "totalTons") {
+                $avgCol[] = "round(sum($ele) , 2) as $ele";
+            } else if ($ele == "LocalendTime") {
+                continue;
+            } else {
+                $avgCol[] = "round(avg($ele) , 2) as $ele";
+            }
+        }
+        $colQuery = implode(' , ', $avgCol);
+
+        $whereQuery = "where LocalendTime >= '{$startTime}' AND  LocalendTime <= '{$endTime}' AND totalTons > 0 AND TPH > $minTPH ";
+
+        $sql = "select '$LocalstartTime' as LocalstartTime, '$LocalendTime' as LocalendTime, $colQuery from analysis_A1_A2_Blend " . $whereQuery;
+
+
+        $results = Yii::app()->db->createCommand($sql)->queryRow();
+
+
+        $finagAvg = HeliosUtility::deriveAverage($results);
+
+
+        return $finagAvg;
+    }
+
+    public static function getDataByInterval($elements, $startTime, $endTime) {
+
+        $query = "select varValue from rm_settings where varKey = 'MINIMUM_TPH'";
+        $minTPH = (int) Yii::app()->db->createCommand($query)->queryScalar();
+
+        foreach ($elements as $ele) {
+            $formula = Formulas::model()->find('name = :name', array(':name' => $ele));
+            if ($formula) {
+                $dElements[$ele] = "round(" . $formula->formula . " , 3) as $ele";
+            } else {
+                $dElements[$ele] = $ele;
+            }
+        }
+        $dElements['LocalendTime'] = 'LocalendTime';
+        $dElements['LocalstartTime'] = 'LocalstartTime';
+
+        $select = implode(',', $dElements);
+        // echo $select ;
+        $result = Yii::app()->db->createCommand()
+                ->select($select)
+                ->from('analysis_A1_A2_Blend')
+                ->where("LocalendTime >= '$startTime'")
+                ->andWhere("LocalendTime <= '$endTime'")
+                ->queryAll();
+
+        return $result;
+    }
+
+    public function getSubTagAvg($subTags) {
+
+        $rmsquery = "select * from rm_settings where varKey = 'SOROS_DISPLAY_ELEMENTS' ";
+        $result = Yii::app()->db->createCommand($rmsquery)->queryRow();
+        if ($result && $result['varValue']) {
+            $showCaseElements = $result['varValue'];
+        }
+        foreach ($subTags as $sTag) {
+
+            $interval = new IntervalObject();
+
+            $interval->setStartTime($sTag['LocalstartTime']);
+            $interval->setEndTime($sTag['LocalendTime']);
+            //setStartTime
+            //setEndTime
+            $analysisDataProvider = new AnalysisDataProvider();
+            $analysisDataProvider->setElements($showCaseElements);
+
+            $data[] = $analysisDataProvider->getIntervalAvg($interval);
+        }
+        $average = array();
+        ;
+        foreach ($data as $row) {
+            foreach (explode(',', $showCaseElements) as $ele) {
+                $average[$ele] [] = $row[$ele];
+            }
+        }
+
+        $eleAvg = array();
+
+        if (!empty($average)) {
+            foreach ($average as $key => $tmpArray) {
+                if ($key == 'totalTons') {
+                    $sum = array_sum($tmpArray);
+                    $eleAvg[$key] = round($sum, 2);
+
+                    continue;
+                }
+
+                if ($key == 'LocalendTime') {
+                    $eleAvg[$key] = ($tmpArray[0]);
+                    continue;
+                }
+                if ($key == 'LocalstartTime') {
+                    $eleAvg[$key] = array_pop($tmpArray);
+                    continue;
+                }
+                $count = count($tmpArray);
+                $sum = array_sum($tmpArray);
+                $avg = $sum / $count;
+                $eleAvg[$key] = round($avg, 2);
+            }
+        } else {
+
+
+            foreach ($elements as $ele) {
+                $eleAvg[$ele] = '-';
+            }
+        }
+
+        return $eleAvg;
+    }
+
+    public function getTagStd($tagObject) {
+
+
+        $sql = "select * from rta_tag_index_sub_tag where tagID = '" . $tagObject->tagID . "'";
+        $subTagList = Yii::app()->db->createCommand($sql)->query()->readAll();
+
+
+        $rmsquery = "select * from rm_settings where varKey = 'SOROS_DISPLAY_ELEMENTS' ";
+        $result = Yii::app()->db->createCommand($rmsquery)->queryRow();
+
+        if ($result && $result['varValue']) {
+            $showCaseElements = $result['varValue'];
+        }
+
+        $startTime = date("Y-m-d H:i:00", strtotime($tagObject->LocalstartTime));
+        $endTime = $tagObject->LocalendTime;
+
+//        $ignoreColumns = ['dataId'];
+        $query = "select varValue from rm_settings where varKey = 'MINIMUM_TPH'";
+        $minTPH = (int) Yii::app()->db->createCommand($query)->queryScalar();
+
+        foreach (explode(",", $showCaseElements) as $ele) {
+
+
+            $formula = Formulas::model()->find('name = :name', array(':name' => $ele));
+            if ($formula) {
+                $avgCol[] = "round(STDDEV(" . $formula->formula . ") , 2) as $ele";
+                continue;
+            }
+
+            if ($ele == "totalTons") {
+                $avgCol[] = "round(sum($ele) , 2) as $ele";
+            } else if ($ele == "LocalendTime") {
+                continue;
+            } else {
+                $avgCol[] = "round(STDDEV($ele) , 2) as $ele";
+            }
+        }
+        $colQuery = implode(' , ', $avgCol);
+
+
+        $dataQuery = array();
+
+        if (count($subTagList) > 0) {
+
+
+            foreach ($subTagList as $subTag) {
+
+
+                $whereQuery = "where LocalendTime >= '" . $subTag['LocalstartTime'] . "' AND  LocalendTime <= '" . $subTag['LocalendTime'] . "' AND totalTons > 0 AND TPH > $minTPH ";
+
+                $sql = "select * from analysis_A1_A2_Blend " . $whereQuery;
+				
+                $dataQuery[] = $sql;
+            }
+
+            $unionQuery = implode(" union ", $dataQuery);
+        } else {
+
+            $whereQuery = "where LocalendTime >= '" . $tagObject->LocalstartTime . "' AND  LocalendTime <= '" . $tagObject->LocalendTime . "' AND totalTons > 0 AND TPH > $minTPH ";
+
+            $sql = "select * from analysis_A1_A2_Blend " . $whereQuery;
+			
+			
+			
+
+            $unionQuery = $sql;
+        }
+        $completeQuery = "select 'LocalstartTime' as LocalstartTime, 'LocalendTime' as LocalendTime, $colQuery from ( $unionQuery ) as s1";
+
+
+        $results = Yii::app()->db->createCommand($completeQuery)->queryRow();
+
+        $lsf_STD = $this->getLSFSTD($tagObject);
+
+        $results['LSF_STD'] = $lsf_STD;
+
+        return $results;
+    }
+
+    public function getTagAvg($tagObject) {
+
+
+        $sql = "select * from rta_tag_index_sub_tag where tagID = '" . $tagObject->tagID . "'";
+        $subTagList = Yii::app()->db->createCommand($sql)->query()->readAll();
+
+
+        $rmsquery = "select * from rm_settings where varKey = 'SOROS_DISPLAY_ELEMENTS' ";
+        $result = Yii::app()->db->createCommand($rmsquery)->queryRow();
+
+        if ($result && $result['varValue']) {
+            $showCaseElements = $result['varValue'];
+        }
+
+        $startTime = date("Y-m-d H:i:00", strtotime($tagObject->LocalstartTime));
+        $endTime = $tagObject->LocalendTime;
+
+//        $ignoreColumns = ['dataId'];
+        $query = "select varValue from rm_settings where varKey = 'MINIMUM_TPH'";
+        $minTPH = (int) Yii::app()->db->createCommand($query)->queryScalar();
+
+        foreach (explode(",", $showCaseElements) as $ele) {
+
+
+            $formula = Formulas::model()->find('name = :name', array(':name' => $ele));
+            if ($formula) {
+                $avgCol[] = "round(avg(" . $formula->formula . ") , 2) as $ele";
+                continue;
+            }
+
+            if ($ele == "totalTons") {
+                $avgCol[] = "round(sum($ele) , 2) as $ele";
+            } else if ($ele == "LocalendTime") {
+                continue;
+            } else {
+                $avgCol[] = "round(avg($ele) , 2) as $ele";
+            }
+        }
+        $colQuery = implode(' , ', $avgCol);
+
+
+        $dataQuery = array();
+
+        if (count($subTagList) > 0) {
+
+
+            foreach ($subTagList as $subTag) {
+
+
+
+                $whereQuery = "where LocalendTime >= '" . $subTag['LocalstartTime'] . "' AND  LocalendTime <= '" . $subTag['LocalendTime'] . "' AND totalTons > 0 AND TPH > $minTPH ";
+
+                $sql = "select * from analysis_A1_A2_Blend " . $whereQuery;
+                $dataQuery[] = $sql;
+            }
+
+            $unionQuery = implode(" union ", $dataQuery);
+        } else {
+
+            $whereQuery = "where LocalendTime >= '" . $tagObject->LocalstartTime . "' AND  LocalendTime <= '" . $tagObject->LocalendTime . "' AND totalTons > 0 AND TPH > $minTPH ";
+
+            $sql = "select * from analysis_A1_A2_Blend " . $whereQuery;
+
+            $unionQuery = $sql;
+        }
+        $completeQuery = "select  'LocalstartTime' as LocalstartTime, 'LocalendTime' as LocalendTime, $colQuery from ( $unionQuery ) as s1";
+
+        //print($completeQuery);
+        //die();
+
+        $results = Yii::app()->db->createCommand($completeQuery)->queryRow();
+
+        $lsf_STD = $this->getLSFSTD($tagObject);
+
+        $results['LSF_STD'] = $lsf_STD;
+
+
+        $finagAvg = HeliosUtility::deriveAverage($results);
+        return $finagAvg;
+        return $results;
+    }
+
+    public function getTagData($tagObject, $page = 1, $pageSize = 50, $interval = 1 ) {
+
+
+        $sql = "select * from rta_tag_index_sub_tag where tagID = '" . $tagObject->tagID . "'";
+        $subTagList = Yii::app()->db->createCommand($sql)->query()->readAll();
+
+
+        $rmsquery = "select * from rm_settings where varKey = 'SOROS_DISPLAY_ELEMENTS' ";
+        $result = Yii::app()->db->createCommand($rmsquery)->queryRow();
+
+        if ($result && $result['varValue']) {
+            $showCaseElements = $result['varValue'];
+        }
+
+        $startTime = date("Y-m-d H:i:00", strtotime($tagObject->LocalstartTime));
+        $endTime = $tagObject->LocalendTime;
+
+//        $ignoreColumns = ['dataId'];
+        $query = "select varValue from rm_settings where varKey = 'MINIMUM_TPH'";
+        $minTPH = (int) Yii::app()->db->createCommand($query)->queryScalar();
+
+        if($interval != $interval){
+            foreach (explode(",", $showCaseElements) as $ele) {
+
+
+                $formula = Formulas::model()->find('name = :name', array(':name' => $ele));
+                if ($formula) {
+                    $avgCol[] = "round(" . $formula->formula . " , 2) as $ele";
+                    continue;
+                }
+    
+                if ($ele == "totalTons") {
+                    $avgCol[] = "round($ele , 2) as $ele";
+                } else if ($ele == "LocalendTime") {
+                    continue;
+                } else {
+                    $avgCol[] = "round($ele , 2) as $ele";
+                }
+            }  
+        }else{
+
+            foreach (explode(",", $showCaseElements) as $ele) {
+
+
+                $formula = Formulas::model()->find('name = :name', array(':name' => $ele));
+                if ($formula) {
+                    $avgCol[] = "round(avg(" . $formula->formula . ") , 2) as $ele";
+                    continue;
+                }
+    
+                if ($ele == "totalTons") {
+                    $avgCol[] = "round(sum($ele) , 2) as $ele";
+                } else if ($ele == "LocalendTime") {
+                    //continue;
+                    $avgCol[] = "round(sum($ele) , 2) as $ele";
+                } else {
+                    $avgCol[] = "round(sum($ele , 2) as $ele";
+                }
+            }
+        }
+        
+        $colQuery = implode(' , ', $avgCol);
+        $dataQuery = array();
+		
+		
+		$offset = ($pageSize  ) * ($page -1);
+
+        $subInterval = $interval * 60;
+
+        if (count($subTagList) > 0) {
+
+
+            foreach ($subTagList as $subTag) {
+
+
+                $whereQuery = "where LocalendTime >= '" . $subTag['LocalstartTime'] . "' AND  LocalendTime <= '" .
+                 $subTag['LocalendTime'] . "' AND totalTons >= 0 AND TPH >= $minTPH GROUP BY
+                UNIX_TIMESTAMP(LocalendTime) DIV $subInterval ";
+
+                $sql = "select $colQuery from analysis_A1_A2_Blend " . $whereQuery;
+                $dataQuery[] = $sql;
+            }
+
+            $unionQuery = implode(" union ", $dataQuery);
+        } else {
+
+            $whereQuery = "where LocalendTime >= '" . $tagObject->LocalstartTime . "' AND  LocalendTime <= '" . 
+            $tagObject->LocalendTime . "' AND totalTons >= 0 AND TPH >= $minTPH GROUP BY
+            UNIX_TIMESTAMP(LocalendTime) DIV $subInterval";
+
+            $sql = "select $colQuery from analysis_A1_A2_Blend " . $whereQuery;
+
+            $unionQuery = $sql;
+        }
+		
+		
+        $completeQuery = "select LocalstartTime , date_format(LocalendTime,'%Y-%m-%d %H:%i') as LocalendTime , $colQuery from ( $unionQuery  order by LocalendTime desc  LIMIT $pageSize OFFSET $offset  ) as s1  order by LocalendTime desc ;";
+
+        $countQuery = "select count(LocalendTime) as count from ( $unionQuery ) as s1 ;";
+
+        // echo $completeQuery;
+        // die();
+
+        $results = Yii::app()->db->createCommand($completeQuery)->queryAll();
+        $totalRecords = Yii::app()->db->createCommand($countQuery)->queryScalar();
+
+        return array('data' => $results , 'totalRecords' => $totalRecords);
+    }
+
+    public function getLSFSTD($tagObject) {
+
+
+        $sql = "select * from rta_tag_index_sub_tag where tagID = '" . $tagObject->tagID . "'";
+        $subTagList = Yii::app()->db->createCommand($sql)->query()->readAll();
+
+
+        $startTime = date("Y-m-d H:i:00", strtotime($tagObject->LocalstartTime));
+        $endTime = $tagObject->LocalendTime;
+
+//        $ignoreColumns = ['dataId'];
+        $query = "select varValue from rm_settings where varKey = 'MINIMUM_TPH'";
+        $minTPH = (int) Yii::app()->db->createCommand($query)->queryScalar();
+
+        foreach (array('LSF') as $ele) {
+
+
+            $formula = Formulas::model()->find('name = :name', array(':name' => $ele));
+            if ($formula) {
+                $avgCol[] = "round(" . $formula->formula . " , 2) as $ele";
+                continue;
+            }
+        }
+        $colQuery = implode(' , ', $avgCol);
+
+        $dataQuery = array();
+		
+		$lsf_result = array();
+        if (count($subTagList) > 0) {
+
+
+            foreach ($subTagList as $subTag) {
+
+
+                $whereQuery = "where LocalendTime >= '" . $subTag['LocalstartTime'] . "' AND  LocalendTime <= '" . $subTag['LocalendTime'] . "' AND totalTons > 0 AND TPH > $minTPH ";
+				
+				$rest = $this->HourlyAverageLSFSTD($subTag['LocalstartTime'] , $subTag['LocalendTime']);
+				$lsf_result[] = $rest;
+			
+
+                $sql = "select * from analysis_A1_A2_Blend " . $whereQuery;
+                $dataQuery[] = $sql;
+            }
+
+            $unionQuery = implode(" union ", $dataQuery);
+        } else {
+
+            $whereQuery = "where LocalendTime >= '" . $tagObject->LocalstartTime . "' AND  LocalendTime <= '" . $tagObject->LocalendTime . "' AND totalTons > 0 AND TPH > $minTPH ";
+
+            $sql = "select * from analysis_A1_A2_Blend " . $whereQuery;
+			
+			$rest = $this->HourlyAverageLSFSTD($tagObject->LocalstartTime, $tagObject->LocalendTime);
+			$lsf_result[] = $rest;
+			
+			
+
+            $unionQuery = $sql;
+			
+			
+        }
+		
+		$lsf_array = array();
+		
+		foreach($lsf_result  as $rdata){
+			 foreach($rdata as $row){
+				 //var_dump($row['LSF']);
+				 if(!is_null($row['LSF'])){
+					 $lsf_array[] = $row['LSF'];
+				 }
+				 
+			 }
+			//echo json_encode($rdata);
+		}
+		//echo json_encode($lsf_array);
+        $completeQuery = "select  $colQuery from ( $unionQuery ) as s1";
+
+        $results = Yii::app()->db->createCommand($completeQuery)->queryAll();
+		
+        $lsf = LabUtility::getColumn($results, 'LSF');
+		
+		
+
+        $std = LabUtility::stdDeviation($lsf);
+		$std_new = LabUtility::stdDeviation($lsf_array);
+		//echo $std_new." => ".$std;
+		
+		//die();
+		
+
+        return round($std_new, 2);
+    }
+	
+	
+		public function HourlyAverageLSFSTD($startTime,$endTime) {
+
+		
+		$datetime1 = new DateTime(date('Y-m-d H:i:s',strtotime($startTime)));
+		$datetime2 = new DateTime(date('Y-m-d H:i:s',strtotime($endTime)));
+
+		$diffInSeconds = $datetime2->getTimestamp() - $datetime1->getTimestamp();
+		$hours = round($diffInSeconds / 3600,0); // since there are 3600 seconds in an hour
+
+		
+		$datetime1 = strtotime(startTime);
+		$datetime2 = strtotime($endTime);
+		
+		$diff = $datetime2 - $datetime1;
+		
+		
+
+        $averageInterval = Yii::app()->request->getParam('averageInterval', 1);
+        $temp = strtotime($startTime);
+        
+        $minutes = (int)date('i',(strtotime($startTime)));
+        if($minutes > 30){
+            $temp = $temp + ((60 - $minutes) * 60);
+            
+        }else{
+            $temp = $temp - ($minutes * 60); 
+        }
+        $startTime = date("Y-m-d H:i:s", $temp);
+        
+
+        $elementArray = HeliosUtility::getDisplayElements();
+        $intervalStartTime = strtotime($startTime);
+        $intervalEndTime = strtotime($startTime) + (($averageInterval * 60 ) * 60 * 8);
+		
+        $res = array();
+		
+		
+	$page = isset($_GET['page']) ? $_GET['page'] : 1; 
+
+	$page = $page == 'undefined' ? 1 : $page;
+		
+	$count = 0;
+	$pageSize = isset($_GET['rowsPerPage']) ? $_GET['rowsPerPage'] : 1000;
+
+	$pageSize = $pageSize  == 'undefined' ? 10 : $pageSize;
+		
+	$offset = ($page -1) * ( 10 );
+		
+	$offsetTime = ($offset *  $averageInterval) * (60 * 60);
+		
+	//Include offset
+	$intervalStartTime =  $intervalStartTime +  $offsetTime;
+	$intervalEndTime = $intervalStartTime  + (($averageInterval * 60) * 60 );
+	$ist = $intervalStartTime;
+	$iet = $intervalEndTime;
+
+
+	while (($intervalStartTime ) <= strtotime($endTime) && ($count < $pageSize)) {
+
+		$intervalEndTimeTM = (date("Y-m-d H:i:s", $intervalEndTime));
+		$intervalStartTimeTM = (date("Y-m-d H:i:s", $intervalStartTime));
+		$result = AnalysisDataProvider::queryAvg($elementArray, $intervalStartTimeTM, $intervalEndTimeTM);
+		$res[] = $result;
+		$intervalStartTime = ($intervalEndTime);
+		$intervalEndTime = (($intervalEndTime) + ( ($averageInterval * 60) * 60));
+		
+	   
+		
+		 $rows = AnalysisDataProvider::getDataByInterval(array('LSF'),$intervalStartTimeTM,$intervalEndTimeTM);
+	   
+		$lsf =  LabUtility::getColumn($rows,'LSF');
+
+		$std =  LabUtility::stdDeviation($lsf);
+		
+		$res[$count]["LSF_STD"] =  $std;
+		$count =  $count + 1;
+		
+
+		
+	}
+        
+		//echo json_encode($res);
+		//die();
+		
+		return $res;
+    }
+
+
+
+}

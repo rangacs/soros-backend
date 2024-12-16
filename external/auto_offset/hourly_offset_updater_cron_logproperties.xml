@@ -1,0 +1,26 @@
+<configuration xmlns="http://logging.apache.org/log4php/">
+<appender name="sabiaConsole" class="LoggerAppenderConsole" />
+<appender name="sabiaFileLogger" class="LoggerAppenderFile">
+        <layout class="LoggerLayoutPattern">
+            <param name="conversionPattern" value="%date{Y-m-d H:i:s} %logger %-5level: %msg%n" />
+        </layout>
+	<param name="file" value="../../tmp/runlog/hourlyOffsetUpdater.log" />
+</appender>
+<differentLevels>
+	<level value="ALL" />
+	<level value="TRACE" />
+	<level value="DEBUG" />
+	<level value="INFO" />
+	<level value="WARN" />
+	<level value="ERROR" />
+	<level value="FATAL" />
+</differentLevels>
+<root>
+	<level value="ERROR" />
+</root>
+<logger name="OffsetUpdater">
+	<level value="ALL" />
+	<appender_ref ref="sabiaFileLogger" />
+	<appender_ref ref="sabiaConsole" />
+</logger>
+</configuration>

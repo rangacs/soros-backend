@@ -1,0 +1,26 @@
+<configuration xmlns="http://logging.apache.org/log4php/">
+<appender name="sabiaDBLogger" class="LoggerAppenderPDO3">
+        <layout class="LoggerLayoutPattern">
+            <param name="conversionPattern" value="%date %logger %-5level %msg%n" />
+        </layout>
+	<param name="dsn" value="mysql:host=localhost;dbname=sabia_helios_v1_m2_1" />
+	<param name="user" value="root" />
+	<param name="password" value="mysqlRoot" />
+	<param name="table" value="rm_log_messages_daemon" />
+</appender>
+<appender name="sabiaConsole" class="LoggerAppenderConsole" />
+<appender name="sabiaFileLogger" class="LoggerAppenderFile">
+        <layout class="LoggerLayoutPattern">
+            <param name="conversionPattern" value="%date{Y-m-d H:i:s} %logger %-5level: %msg%n" />
+        </layout>
+	<param name="file" value="./sabia.log" />
+</appender>
+<root>
+	<level value="ALL" />
+</root>
+<logger name="heliosLogger">
+	<level value="ALL" />
+	<appender_ref ref="sabiaFileLogger" />
+	<appender_ref ref="sabiaConsole" />
+</logger>
+</configuration>

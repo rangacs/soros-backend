@@ -1,0 +1,193 @@
+﻿
+/* 
+    Created on : Apr 3, 2014, 10:55:31 PM
+    Author     : Abhinandan
+*/
+
+ a.longSize {width:810px !important; margin-left:5px;}
+.funelDiv{ width:auto; height:auto; margin:auto; background:url(../images/rawmix/images/bottom-line.png) no-repeat; position:relative; z-index:0; }
+.chikmik {
+    margin: 0 0 0 61px;
+    padding-top: 29px;
+}
+
+/*funnel1 starts*/
+.funelItemDiv{ width:66px; height:146px; margin:50px 0 0 22px; float:left; }
+.funelItem{ width:62px; position:absolute; bottom:140px; margin:0 0 0 2px; z-index:0; }
+.funelItem2{ width:22px; position:relative; bottom:142px; margin:0 0 0 12px; z-index:1; }
+/*
+.textItem{ float:left; margin:0 0 0 -28px; position:absolute; z-index:10; bottom:70px; font:16px Georgia bold, "Times New Roman", Times, serif; color:#43514b; }
+*/
+.lineItem{ margin:146px 0 0 26px; position:relative; }
+.textItem {
+    bottom: 160px;
+    color: #43514B;
+    float: left;
+    font: 12px Georgia bold,"Times New Roman",Times,serif;
+    margin: 0 0 0 2px;
+    position: absolute;
+    z-index: 10;
+    background:white;
+    width:62px;
+    text-align:center;
+}
+.textItem3 {
+    bottom: 140px;
+    color: red;
+    float: left;
+    font: 12px Georgia bold,"Times New Roman",Times,serif;
+    margin: 0 0 0 2px;
+    position: absolute;
+    z-index: 10;
+    background:white;
+    width:62px;
+    text-align:center;
+}
+.textItem2 {
+    bottom: 200px;
+    color: brown !important;
+    float: left;
+    font: 16px Georgia bold,"Times New Roman",Times,serif;
+    margin: 0 0 0 2px;
+    position: absolute;
+    z-index: 10;
+    background:white;
+    width:62px;
+    text-align:center;
+}
+.textItem8 {
+    bottom: 225px;
+    color: brown !important;
+    float: left;
+    font: 16px Georgia bold,"Times New Roman",Times,serif;
+    margin: 0 0 0 20px;
+    position: absolute;
+    z-index: 10;
+    width:62px;
+    text-align:center;
+}
+
+.numberCircle {
+    border-radius: 50%;
+    behavior: url(PIE.htc); /* remove if you don't care about IE8 */
+
+    width: 16px;
+    height: 16px;
+    padding: 4px;
+
+    background: #fff;
+    border: 2px solid #666;
+    color: #666;
+    text-align: center;
+}
+.showFlowRate {
+    background: none repeat scroll 0 0 #FFFFFF;
+    height: 250px;
+    left: 616px;
+    margin: 2px;
+    position: absolute;
+    top: 20px;
+    width: 4%;
+    z-index: 0;
+}
+
+.showAcceptButton {
+    background: none repeat scroll 0 0 #FFFFFF;
+    bottom: 1px;
+    height: auto;
+    left: 56px;
+    margin: 2px;
+    position: absolute;
+    width: auto;
+    z-index: 0;
+}
+
+.flowRate{ width:96%; position:relative; bottom:0px; margin-left:2%; margin-top:1%; z-index:0; }
+
+.funelName{ 
+	font:bold 13px Georgia, "Times New Roman", Times, serif; 
+	color:#43514b; text-align:center; position:absolute; margin:-28px 0 0 0px; 
+}
+.undefined{ margin:0 0 0 450px; }
+
+.glow1{ margin:-14px 0 0 -13px; position:absolute; }
+/*.chik{ width:439px; height:108px; background:url('../images/chikmik.gif') no-repeat; position:absolute; margin:243px 0 0 311px; z-index:10; }
+*/
+.glow1 img{
+    position:absolute;
+    top:0;
+}
+
+.grid_rawMix {
+	width:750px !important;
+}
+
+#section_rawMix {
+	margin-top:0px !important;
+}
+
+#Charts_2{
+	width:1100px !important;	
+}	
+
+.feedDisplay {
+	width:660px !important;	
+}
+.tabDisplay {
+	width:440px !important;	
+}
+
+
+.redBlinkerbutton {
+  background-color: #004A7F;
+  -webkit-border-radius: 10px;
+  border-radius: 10px;
+  border: none;
+  color: #FFFFFF;
+  cursor: pointer;
+  display: inline-block;
+  font-family: Arial;
+  font-size: 18px;
+  padding: 5px 5px;
+  text-align: center;
+  text-decoration: none;
+}
+@-webkit-keyframes glowing {
+  0% { background-color: #B20000; -webkit-box-shadow: 0 0 3px #B20000; }
+  50% { background-color: #FF0000; -webkit-box-shadow: 0 0 40px #FF0000; }
+  100% { background-color: #B20000; -webkit-box-shadow: 0 0 3px #B20000; }
+}
+
+@-moz-keyframes glowing {
+  0% { background-color: #B20000; -moz-box-shadow: 0 0 3px #B20000; }
+  50% { background-color: #FF0000; -moz-box-shadow: 0 0 40px #FF0000; }
+  100% { background-color: #B20000; -moz-box-shadow: 0 0 3px #B20000; }
+}
+
+@-o-keyframes glowing {
+  0% { background-color: #B20000; box-shadow: 0 0 3px #B20000; }
+  50% { background-color: #FF0000; box-shadow: 0 0 40px #FF0000; }
+  100% { background-color: #B20000; box-shadow: 0 0 3px #B20000; }
+}
+
+@keyframes glowing {
+  0% { background-color: #B20000; box-shadow: 0 0 3px #B20000; }
+  50% { background-color: #FF0000; box-shadow: 0 0 40px #FF0000; }
+  100% { background-color: #B20000; box-shadow: 0 0 3px #B20000; }
+}
+
+.redBlinkerbutton {
+  -webkit-animation: glowing 1500ms infinite;
+  -moz-animation: glowing 1500ms infinite;
+  -o-animation: glowing 1500ms infinite;
+  animation: glowing 1500ms infinite;
+}
+
+.greenBlinkerbutton {}
+.orangeBlinkerbutton {}
+
+.customStyle tbody td {
+	height:14px !important;
+	font-size:14px;
+}
+

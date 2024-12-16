@@ -1,0 +1,186 @@
+<?php
+
+/**
+ * This is the model class for table "tag_group".
+ *
+ * The followings are the available columns in table 'tag_group':
+ * @property string $tagGroupID
+ * @property string $tagGroupName
+ * @property string $rtaMasterID
+ * @property string $massflowWeight
+ * @property string $goodDataSecondsWeight
+ */
+class TagGroup extends CActiveRecord {
+
+    /**
+     * @return string the associated database table name
+     */
+    public $totalTags;
+    public $startTime;
+    public $endTime;
+
+    public function tableName() {
+        return 'tag_group';
+    }
+
+    /**
+     * @return array validation rules for model attributes.
+     */
+    public function rules() {
+        // NOTE: you should only define rules for those attributes that
+        // will receive user inputs.
+        return array(
+            array('tagGroupName, rtaMasterID, massflowWeight, goodDataSecondsWeight', 'required'),
+            array('tagGroupName', 'length', 'max' => 120),
+            array('rtaMasterID', 'length', 'max' => 4),
+            array('massflowWeight, goodDataSecondsWeight', 'length', 'max' => 1),
+            // The following rule is used by search().
+            // @todo Please remove those attributes that should not be searched.
+            array('tagGroupID, tagGroupName, rtaMasterID, massflowWeight, goodDataSecondsWeight', 'safe', 'on' => 'search'),
+        );
+    }
+
+    /**
+     * @return array relational rules.
+     */
+    public function relations() {
+        // NOTE: you may need to adjust the relation name and the related
+        // class name for the relations automatically generated below.
+        return array(
+        );
+    }
+
+    /**
+     * @return array customized attribute labels (name=>label)
+     */
+    public function attributeLabels() {
+        return array(
+            'tagGroupID' => Yii::t('app', 'Tag Group'),
+            'tagGroupName' => Yii::t('app', 'Tag Group Name'),
+            'rtaMasterID' => Yii::t('app', 'Rta Master'),
+            'massflowWeight' => Yii::t('app', 'Massflow Weight'),
+            'goodDataSecondsWeight' => Yii::t('app', 'Good Data Seconds Weight'),
+            'totalTags' => Yii::t('app', 'No of Tags'),
+            'startTime' => Yii::t('app', 'Start Time'),
+            'endTime' => Yii::t('app', 'End Time'),
+            
+        );
+    }
+
+    /**
+     * Retrieves a list of models based on the current search/filter conditions.
+     *
+     * Typical usecase:
+     * - Initialize the model fields with values from filter form.
+     * - Execute this method to get CActiveDataProvider instance which will filter
+     * models according to data in model fields.
+     * - Pass data provider to CGridView, CListView or any similar widget.
+     *
+     * @return CActiveDataProvider the data provider that can return the models
+     * based on the search/filter conditions.
+     */
+    public function search() {
+        // @todo Please modify the following code to remove attributes that should not be searched.
+
+        $criteria = new CDbCriteria;
+
+        $criteria->compare('tagGroupID', $this->tagGroupID, true);
+        $criteria->compare('tagGroupName', $this->tagGroupName, true);
+        $criteria->compare('rtaMasterID', $this->rtaMasterID, true);
+        $criteria->compare('massflowWeight', $this->massflowWeight, true);
+        $criteria->compare('goodDataSecondsWeight', $this->goodDataSecondsWeight, true);
+
+
+        //massflowWeight , goodDataSecondsWeight
+        return new CActiveDataProvider($this, array(
+            'criteria' => $criteria,
+        ));
+    }
+
+    /**
+     * Returns the static model of the specified AR class.
+     * Please note that you should have this exact method in all your CActiveRecord descendants!
+     * @param string $className active record class name.
+     * @return TagGroup the static model class
+     */
+    public static function model($className = __CLASS__) {
+        return parent::model($className);
+    }
+
+    public function getAllTags() {
+
+        $queuedTags = $this->getQuedTags();
+        $completedTags = $this->getCompletedTags();
+
+        return array('queuedTags' => $queuedTags, 'completedTags' => $completedTags);
+    }
+
+    public function getCompletedTags() {
+
+        $tagGroupID = $this->tagGroupID;
+        $query = "select * from rta_tag_index_completed where tagGroupID = $tagGroupID";
+
+        $results = Yii::app()->db->createCommand($query)->queryAll();
+
+        return $results;
+    }
+
+    public function getQuedTags() {
+
+        $tagGroupID = $this->tagGroupID;
+        $query = "select * from rta_tag_index_queued where tagGroupID = $tagGroupID";
+        $results = Yii::app()->db->createCommand($query)->queryAll();
+        return $results;
+    }
+
+    public function getItems() {
+
+        $completedSql = 'select count(tagGroupID) as total from rta_tag_index_completed where tagGroupID =' . $this->tagGroupID;
+
+        $queuedSql = 'select count(tagGroupID) as total from rta_tag_index_queued where tagGroupID =' . $this->tagGroupID;
+
+        $completedCount = Yii::app()->db->createCommand($completedSql)->queryScalar();
+        $queuedCount = Yii::app()->db->createCommand($queuedSql)->queryScalar();
+
+
+        return $completedCount + $queuedCount;
+    }
+
+    public function getStartTime() {
+        $compStartTimeSql = 'select min(LocalstartTime) as minTime from rta_tag_index_completed where tagGroupID =' . $this->tagGroupID;
+        $queuedStartTimeSql = 'select min(LocalstartTime) as minTime from rta_tag_index_queued where tagGroupID =' . $this->tagGroupID;
+
+
+        $compStartTime = Yii::app()->db->createCommand($compStartTimeSql)->queryScalar();
+        $queuedStartTime = Yii::app()->db->createCommand($queuedStartTimeSql)->queryScalar();
+
+        if (strtotime($compStartTime) > strtotime($queuedStartTime)) {
+
+            return $compStartTime;
+        } else {
+
+            return $compStartTime;
+        }
+
+    }
+
+    public function getEndTime() {
+
+
+        $compEndTimeSql = 'select max(LocalendTime) as maxTime from rta_tag_index_completed where tagGroupID =' . $this->tagGroupID;
+        $queuedEndTimeSql = 'select max(LocalendTime) as maxTime from rta_tag_index_queued where tagGroupID =' . $this->tagGroupID;
+
+
+        $compEndTime = Yii::app()->db->createCommand($compEndTimeSql)->queryScalar();
+        $queuedEndTime = Yii::app()->db->createCommand($queuedEndTimeSql)->queryScalar();
+
+        if (strtotime($compEndTime) > strtotime($queuedEndTime)) {
+
+            return $compEndTime;
+        } else {
+
+            return $compEndTime;
+        }
+    }
+
+}

@@ -1,0 +1,159 @@
+<?php
+
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
+
+/**
+ * Description of TagHelper
+ *
+ * @author veda
+ */
+class TagHelper {
+
+    //put your code here
+
+
+    /**
+     * 
+     * @param TagCompleted  $tagObject
+     * @param array $elements
+     */
+    public static function renderTagtable($tagObject, $elements) {
+
+        $dateTimeFormat = RmSettings::getValueFromKey('GLOBAL_TIME_FORMAT', "Y-m-d H:i:s");
+        $tagName = $tagObject->tagName;
+        
+        $starTime = $tagObject->LocalstartTime;
+        $endTime  = $tagObject->LocalendTime;
+
+        $records = $tagObject->getRecords();
+	$data 	 =  array_reverse($records);
+
+        echo '  <div class="clearfix">
+                <header class="ui-widget-header ui-corner-top">
+                <h2> showing data for '.$tagName . " (".date($dateTimeFormat,strtotime($starTime))." to ".date($dateTimeFormat,strtotime($endTime)).') </h2>
+                </header>
+                <section class="ui-widget-content ui-corner-bottom">
+                <div class="clearfix">
+                <table id="tagview" class="customStyle dataTable no-footer">';
+
+        self::renderHeader($elements);
+
+
+        self::renderBody($data, $elements);
+
+        echo    '</table></div>
+                </section>
+                </div>';
+
+        self::initDataTable();
+    }
+
+    public static function renderHeader($elements) {
+
+        echo '<thead><tr>';
+            echo '<th class="ui-state-default">End-Time</th>';
+
+        foreach ($elements as $ele) {
+
+            if($ele == "BTU")
+                $ele = "GCV";
+            echo '<th class="ui-state-default">' . $ele . '</th>';
+        }
+
+        echo '</tr></thead>';
+    }
+
+    public static function renderBody($data, $elements) {
+
+        $dataTimeFormat = RmSettings::getValueFromKey('GLOBAL_TIME_FORMAT', 'Y-m-d H:i:s');
+        echo "<tbody>";
+        foreach ($data as $row) {
+        
+            echo '<tr>';
+            echo "<td>" . date($dataTimeFormat, strtotime($row["LocalendTime"])) . "</td>";
+
+            foreach ($elements as $ele) {
+
+
+                $tAl2O3 = (float) $row['Al2O3'];
+
+                $tSiO2 = (float) $row['SiO2'];
+
+                $tFe2O3 = (float) $row['Fe2O3'];
+
+                $tCaO = (float) $row['CaO'];
+
+            
+                //Calculate formulas
+                if ($ele == 'KH') {
+                    if ($tSiO2 > 0) {
+                        $formulaVal = round((($tCaO - 1.65 * $tAl2O3 - 0.35 * $tFe2O3) / (2.80 * $tSiO2)),2);
+                    } else {
+                        $formulaVal = 0.0;
+                    }
+                    $row[$ele] = $formulaVal;
+                } elseif ($ele == "SM") {
+                    if (($tAl2O3 + $tFe2O3) > 0) {
+                        $formulaVal = round((($tSiO2) / ($tAl2O3 + $tFe2O3)), 2);
+                    } else {
+                        $formulaVal = 0.0;
+                    }
+                    $row[$ele] = $formulaVal;
+                } elseif ($ele == "AM") {
+                    if ($tFe2O3 > 0) {
+                        $formulaVal = round(($tAl2O3 / $tFe2O3), 2);
+                    } else {
+                        $formulaVal = 0.0;
+                    }
+                    $row[$ele] = $formulaVal;
+                } elseif ($ele == "IM") {
+                    if ($tFe2O3 > 0) {
+                        $formulaVal = round(($tAl2O3 / $tFe2O3), 2);
+                    } else {
+                        $formulaVal = 0.0;
+                    }
+                    $row[$ele] = $formulaVal;
+                }
+
+                echo "<td>" . $row[$ele] . "</td>";
+            }
+            echo '</tr>';
+        }
+        echo "</tbody>";
+    }
+
+    public static function initDataTable(){
+
+    }
+    
+    public static function DumpTable($array_assoc, $exAr) {
+            
+            if (is_array($array_assoc)) {
+                echo '<table class="dataTable">';
+                echo '<thead>';
+                echo '<tr>';
+
+                foreach ($array_assoc as $key => $value):
+                    if(!in_array($key,$exAr))
+                        echo '<th>' . str_replace("w_","",$key) . '</th>';
+                endforeach;
+                echo '</tr>';
+                echo '</thead>';
+                echo '<tbody>';
+                echo '<tr>';
+                foreach ($array_assoc as $key => $value):
+                    if(!in_array($key,$exAr))
+                        echo '<td>' . $value . '</td>';
+                endforeach;
+                echo '</tr>';
+                echo '</tbody>';
+                echo '</table>';
+                return;
+            }
+        }
+
+}

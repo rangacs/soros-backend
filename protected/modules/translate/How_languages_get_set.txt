@@ -1,0 +1,8 @@
+
+ Abhinandan. --
+
+  The languages are set via a POST to '..applicationname/translate/translate/set' ...Open up the 'TranslateController' and you will see the 'actionSet()'. Inside here is where you want to see the setLanguage() taking place..
+
+ -- END --
+
+
